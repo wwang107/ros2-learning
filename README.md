@@ -1,116 +1,149 @@
-# ROS 2 Jazzy sim playground
+# Wheeled robot in simulation (ROS 2 + Gazebo)
 
-A differential-drive robot with a 360° lidar in a small Gazebo room, set up for SLAM (slam_toolbox) and navigation (Nav2). Everything runs in a Podman container with a Linux desktop served in the browser via noVNC.
+A differential-drive robot with a 2D lidar drives around a simulated room. `slam_toolbox` builds a map
+and `nav2` is set up to drive to goals. Everything runs inside one Podman container with a Linux desktop
+you open in the browser. See `MILESTONE.md` for the goals and steps.
 
-## Layout
+## Status
+- Works: the simulated robot, driving it with `/cmd_vel`, lidar on `/scan`, odometry on `/odom`, mapping with `slam_toolbox`.
+- Starts but does not work yet: Nav2 goals. The planner aborts with `NO_VALID_PATH` (error 208),
+  because the global costmap marks the robot's own surroundings as obstacles.
+  - Cause found so far: the lidar's beam hit the floor when the robot tilted. I raised the lidar and added a front caster,
+    which reduced the tilt (bad lidar rays went from 88 to 11) but I did not confirm that goals now succeed.
+- Not tried: teleop by hand and RViz inside the container. Only scripted driving was tested.
 
-| Path | Contents |
+## Folder layout
+| Path | What it is |
 |---|---|
-| `docker/Dockerfile` | `tiryoh/ros2-desktop-vnc:jazzy` + Gazebo (`ros-gz`), Nav2, slam_toolbox, teleop |
-| `worlds/room.sdf` | Walled room with a box and `diff_bot` (diff drive, `gpu_lidar` on `/scan`) |
-| `launch/sim_slam.launch.py` | Gazebo server + GUI, ROS–Gazebo bridge, `base`→`lidar_link` static TF, slam_toolbox (mapping) |
-| `launch/sim_nav.launch.py` | `sim_slam` + Nav2 servers (map comes from slam_toolbox, so no map_server/AMCL) |
-| `config/nav2_params.yaml` | Nav2 parameters (robot frame is `base`) |
-| `run.sh` | (Re)creates and starts the `ros-gz` container |
+| `ros/docker/Dockerfile` | Builds the container image `ros-gz-vnc:jazzy` (ROS 2 Jazzy, Gazebo, Nav2, slam_toolbox, desktop). |
+| `ros/worlds/room.sdf` | The simulated world: 8x8 m room, one box, and the robot with its lidar. |
+| `ros/launch/sim_slam.launch.py` | Starts Gazebo, the ROS bridge, the lidar transform and `slam_toolbox`. |
+| `ros/launch/sim_nav.launch.py` | Starts everything above plus Nav2. This is the main launch file. |
+| `ros/config/nav2_params.yaml` | Nav2 settings (frames, robot radius, controller). |
+| `MILESTONE.md` | Project goals and steps. |
 
-## Setup
+`ros/worlds`, `ros/launch` and `ros/config` are mounted into the container at `/opt/sim/`, so you can edit them on your Mac.
+Anything else you create inside the container is lost if the container is deleted.
 
-Build the image once:
+## One-time setup
+1. Podman needs about 8 GB of RAM for its VM: `podman machine set --memory 8192` (stop the machine first with `podman machine stop`, then start it).
+2. Build the image (takes several minutes): `cd ros/docker && podman build -t ros-gz-vnc:jazzy .`
+3. Create the container, from the `ros/` folder:
 
-```bash
-podman build -t ros-gz-vnc:jazzy docker/
+```
+podman run -d --name ros-gz -p 6080:80 --shm-size=1g \
+  --sysctl net.ipv4.ip_unprivileged_port_start=0 \
+  -v "$PWD/worlds":/opt/sim/worlds:Z \
+  -v "$PWD/launch":/opt/sim/launch:Z \
+  -v "$PWD/config":/opt/sim/config:Z \
+  localhost/ros-gz-vnc:jazzy
 ```
 
-Start the container:
+## Every time you work
+1. Start Podman and the container: `podman machine start` (if stopped), then `podman start ros-gz`.
+2. Open **http://localhost:6080** in your browser. The VNC password is `ubuntu`. You now see a Linux desktop.
+3. On that desktop, open a terminal (the Terminator icon) and run the simulation:
+   ```
+   ros2 launch /opt/sim/launch/sim_nav.launch.py
+   ```
+   Wait about 30-60 seconds. A Gazebo window opens with the room and the robot.
+   Use `sim_slam.launch.py` instead if you want mapping without Nav2.
+4. Open a second terminal and drive the robot by hand:
+   ```
+   ros2 run teleop_twist_keyboard teleop_twist_keyboard
+   ```
+   Keep that terminal focused and press `i` (forward), `j`/`l` (turn), `k` (stop).
+5. Open a third terminal and start RViz: `rviz2`
+   - Set **Fixed Frame** to `map`.
+   - Click **Add**, open the **By topic** tab, and add **Map** under `/map` and **LaserScan** under `/scan`.
+   - Add **TF** to see the robot's frames move.
+6. Stop with `Ctrl+C` in the launch terminal, and `podman stop ros-gz` when you are done.
 
-```bash
-./run.sh
+If you change `room.sdf` or a launch file, stop the launch with `Ctrl+C` and start it again.
+If processes are stuck, run `podman restart ros-gz`.
+
+## Working from your Mac terminal
+Copy and paste (`Cmd+C`, `Cmd+V`) does not cross into the browser desktop. A Mac terminal avoids that: all your usual
+shortcuts work, and you only use the browser tab to look at Gazebo and RViz.
+
+**Open a shell inside the container** (do this in each new Mac terminal tab):
 ```
-
-Open http://localhost:6080 (user/password: `ubuntu`/`ubuntu`). The project folder is mounted at `/opt/sim`, so edits on the Mac show up in the container immediately.
-
-To get a shell without the browser:
-
-```bash
 podman exec -it -u ubuntu ros-gz bash
+source /opt/ros/jazzy/setup.bash
+```
+Then use `ros2` commands, teleop and your Python scripts as in the sections below.
+
+**Programs with windows** (RViz, Gazebo) draw on the container's desktop at `:1`, so you can start them from the Mac
+terminal. Add `-e DISPLAY=:1` when you open the shell, and the window appears in the browser tab:
+```
+podman exec -it -u ubuntu -e DISPLAY=:1 ros-gz bash
+source /opt/ros/jazzy/setup.bash
+rviz2
 ```
 
-## Running the sim
+**Typical session with three Mac terminal tabs**
+| Tab | Shell opened with | Command |
+|---|---|---|
+| 1 | `-e DISPLAY=:1` | `ros2 launch /opt/sim/launch/sim_nav.launch.py` |
+| 2 | no display needed | `ros2 run teleop_twist_keyboard teleop_twist_keyboard` |
+| 3 | `-e DISPLAY=:1` | `rviz2` |
 
-In a terminal on the noVNC desktop:
+Keep the browser tab at http://localhost:6080 open to see the windows.
 
-```bash
-cd /opt/sim
-ros2 launch launch/sim_slam.launch.py      # sim + mapping
-```
-
-Drive the robot to build the map (second terminal):
-
-```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-
-Or run the full stack with autonomous navigation:
-
-```bash
-ros2 launch launch/sim_nav.launch.py
-```
-
-To see the map, start `rviz2`, set **Fixed Frame** to `map`, and add `/map` and `/scan` displays. With Nav2 running, use **2D Goal Pose** to send the robot somewhere.
-
-Stop launches with **Ctrl+C** and wait for them to finish. Closing the terminal or browser tab can leave Gazebo and bridge processes running in the background.
-
-## Writing your own packages
-
-Create a colcon workspace in the project so the code lives on the Mac:
-
-```bash
-cd /opt/sim
-mkdir -p src && cd src
-ros2 pkg create --build-type ament_python my_first_pkg --dependencies rclpy std_msgs
-cd /opt/sim
-colcon build --symlink-install
-source install/setup.bash
-ros2 run my_first_pkg <executable>
-```
-
-## IDE (IntelliJ / PyCharm)
-
-`rclpy` can't be installed on macOS, so the IDE gets completion and linting from a copy of the container's ROS Python sources:
-
-- The sources are copied to `~/.local/share/ros-jazzy-python`:
-  ```bash
-  mkdir -p ~/.local/share/ros-jazzy-python
-  podman cp ros-gz:/opt/ros/jazzy/lib/python3.12/site-packages/. ~/.local/share/ros-jazzy-python/
+**Good to know**
+- A program started in a Mac terminal stops when you close that tab or press `Ctrl+C`.
+- Teleop reads keys from the terminal it runs in, so keep that tab focused. It works the same as in the desktop terminal.
+- To save typing, add an alias to `~/.zshrc`:
   ```
-- `../venv/lib/python3.12/site-packages/ros_jazzy.pth` adds that folder to the venv's `sys.path` (after the venv's own packages, so they take priority).
-- The IDE project interpreter is `../venv` (Python 3.12, same as the container).
+  alias rosg='podman exec -it -u ubuntu -e DISPLAY=:1 ros-gz bash -c "source /opt/ros/jazzy/setup.bash; exec bash"'
+  ```
+  Then `rosg` opens a ready shell.
+- I tested starting the launch file and scripts this way with `podman exec`, but I have not tried teleop or RViz from a Mac terminal.
 
-This is for editing only. The copied modules include Linux-only compiled code, so `import rclpy` fails if you run it on the Mac. Build and run in the container terminal. Re-run the `podman cp` after installing new ROS packages in the image. To undo, delete the `.pth` file.
+## ROS 2 in five ideas
+- **Node:** a program that does one job (for example, the lidar bridge or `slam_toolbox`). A robot is many nodes running together.
+- **Topic:** a named channel nodes use to send messages. One node publishes, others subscribe.
+  Here: `/cmd_vel` (drive commands), `/odom` (wheel odometry), `/scan` (lidar), `/map` (the map).
+- **Message type:** the shape of the data on a topic, for example `geometry_msgs/Twist` for velocity or `sensor_msgs/LaserScan` for lidar.
+- **Frame and TF:** every part of the robot and the world has a coordinate frame, and TF is the tree of transforms between them.
+  Here: `map` -> `odom` -> `base` -> `lidar_link`. `slam_toolbox` provides `map` -> `odom`, the simulator provides `odom` -> `base`.
+- **Action:** a long-running request with feedback and a result, like "drive to this pose" (`/navigate_to_pose` in Nav2).
+- **Launch file:** a Python file that starts many nodes together with their settings.
 
-Using the container itself as the interpreter (**Add Interpreter → On Docker**) needs the paid **Python** plugin (`Pythonid`), not *Python Community Edition*. If you switch to that: connect via **Settings → Build, Execution, Deployment → Docker → +** → *Podman* with executable `/opt/podman/bin/podman`, then add `/opt/ros/jazzy/lib/python3.12/site-packages` under **Show Interpreter Paths**.
+## How the pieces connect
+```
+ Gazebo (physics, lidar)  <--ros_gz_bridge-->  ROS 2 topics: /scan /odom /tf /clock /cmd_vel
+                                                      |
+                                    slam_toolbox  (reads /scan + /odom, publishes /map and map->odom)
+                                                      |
+                                    nav2 (reads /map + /scan, plans a path, publishes /cmd_vel)
+```
+Gazebo has its own message system, and `ros_gz_bridge` copies messages between it and ROS 2.
+The simulated time comes from `/clock`, which is why nodes are started with `use_sim_time: true`.
+
+## Useful commands (run in a container terminal)
+| Command | What it does |
+|---|---|
+| `ros2 topic list` | List all topics. |
+| `ros2 topic echo /odom` | Print messages on a topic. Add `--once` for one message. |
+| `ros2 topic hz /scan` | Show how often a topic publishes. |
+| `ros2 topic info /cmd_vel` | Show the type and who publishes or subscribes. |
+| `ros2 node list` | List running nodes. |
+| `ros2 run tf2_ros tf2_echo map base` | Print the robot's pose in the map. |
+| `ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.3}}"` | Send one drive command. |
+| `ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose "{pose: {header: {frame_id: map}, pose: {position: {x: -2.0, y: -2.0}, orientation: {w: 1.0}}}}"` | Send a Nav2 goal. |
+| `ros2 run tf2_tools view_frames` | Save a diagram of the TF tree to a PDF. |
 
 ## Troubleshooting
+- **Port 6080 does not load:** the container needs the `--sysctl net.ipv4.ip_unprivileged_port_start=0` flag. Recreate it with the command above.
+- **RViz says "empty topic name":** the display's Topic field is blank. Set it, or add the display from the **By topic** tab.
+- **No map in RViz:** check that the launch is running. For the Map display, set Durability Policy to `Transient Local`.
+- **Nav2 goal aborts (code 208):** see Status above. Inspect `/global_costmap/costmap` in RViz (add a Map display on that topic).
+- **Slow or laggy:** the container has no GPU and renders in software. Close extra RViz displays.
+- **Gazebo window is black:** the models need materials and the scene needs ambient light. `room.sdf` already sets both.
 
-**localhost:6080 doesn't load.** noVNC runs as `ubuntu` and binds port 80. Unlike Docker, Podman doesn't let non-root users bind ports below 1024, so the container needs `--sysctl net.ipv4.ip_unprivileged_port_start=0`. `run.sh` sets this. Check with:
-
-```bash
-podman logs ros-gz | grep novnc
-```
-
-**`[RTPS_TRANSPORT_SHM Error] Failed init_port ... open_and_lock_file failed`.** These are stale Fast DDS shared-memory files in `/dev/shm`, left by processes that were killed. The error is harmless (Fast DDS falls back to another port or UDP). Restart the container to clear them, or set `export FASTDDS_BUILTIN_TRANSPORTS=UDPv4` to skip shared memory entirely.
-
-**Robot pose or clock jumps; SLAM or Nav2 behave strangely.** Check for leftover sims from earlier launches:
-
-```bash
-podman exec ros-gz pgrep -af "gz sim|parameter_bridge"
-```
-
-More than one `gz sim` means several sims are publishing at once. Kill them or restart the container.
-
-**`Permission denied` when creating or building packages.** Inside the container, files and folders created on the Mac belong to uid 501, while the container user `ubuntu` is uid 1000. Files the container created and the Mac then edited end up `rw-------`, which `ubuntu` can't read. Fix permissions from the Mac:
-
-```bash
-chmod -R a+rX src                        # let the container read everything in src/
-podman exec ros-gz chown 1000:1000 /opt/sim/src   # let the container create packages in a src/ made on the Mac
-```
+## Learning resources
+- ROS 2 Jazzy tutorials: https://docs.ros.org/en/jazzy/Tutorials.html (start with "Beginner: CLI tools" and "Client libraries")
+- Nav2 documentation: https://docs.nav2.org
+- `slam_toolbox`: https://github.com/SteveMacenski/slam_toolbox
+- Gazebo Sim documentation: https://gazebosim.org/docs/harmonic
