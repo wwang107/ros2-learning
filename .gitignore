@@ -1,0 +1,18 @@
+# colcon workspace output
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
