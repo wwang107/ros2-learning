@@ -8,7 +8,8 @@ Simulation first (Gazebo with ROS 2), real hardware after the simulation works.
 - Folder: `~/robotic-projects`
 - Everything runs inside one Podman container: ROS 2 Jazzy, Gazebo Harmonic, Nav2, slam_toolbox, RViz.
   Image: `ros/docker/Dockerfile` (tag `ros-gz-vnc:jazzy`). Desktop in the browser at http://localhost:6080 (password `ubuntu`).
-  Start with `podman start ros-gz`. `ros/worlds`, `ros/launch` and `ros/config` are mounted at `/opt/sim/`.
+  Start with `ros/run.sh`, or `podman start ros-gz` to resume a stopped container. The whole `ros/` folder is mounted at `/opt/sim/`,
+  so the worlds, launch files, config and your `src/` packages are all visible in the container.
   Podman VM has 8 GB RAM. The container needs `--sysctl net.ipv4.ip_unprivileged_port_start=0`.
 - Why a container: Gazebo's 3D window does not render in the native macOS (RoboStack) build, so that setup was removed.
 - Mac, no CUDA, software rendering in the container.
@@ -30,14 +31,16 @@ Status: done / in progress / not started.
 2. **Map with lidar SLAM.** *Status: done, partly checked.* A simulated 2D lidar on `/scan`, bridged to ROS 2, with `slam_toolbox`.
    Check: a scripted drive builds a map that matches the room size, saved as an image.
    So far: a 157x157 cell map (about 7.85 m) was built. It was not saved as an image.
-3. **ROS 2 basics in Python.** *Status: not started.* Write your own nodes with `rclpy`: a publisher, a subscriber, and a node that
-   reads `/scan` and publishes `/cmd_vel` (for example, stop before a wall).
+3. **ROS 2 basics in Python.** *Status: in progress.* Write your own nodes with `rclpy`, as colcon packages in `ros/src/`:
+   a publisher, a subscriber, and a node that reads `/scan` and publishes `/cmd_vel` (for example, stop before a wall).
+   So far: `my_first_pkg` (a `talker` and a `listener` over `/chatter`) is written. Next: a second package that subscribes to `/scan`,
+   then one that also publishes `/cmd_vel`.
    Check: the node drives the robot to stop 0.5 m from a wall in 5 of 5 runs.
-   This needs a code folder mounted into the container (for example `ros/scripts`), which does not exist yet.
+   The workspace is built inside the container; see `ros/README.md`.
 4. **TF, time and QoS.** *Status: not started.* Draw the TF tree with `ros2 run tf2_tools view_frames`, add a static transform by hand,
    and explain `use_sim_time` and QoS settings in your own words.
    Check: a short note in `README.md` and a working custom transform.
-5. **Navigate to a goal.** *Status: in progress, blocked.* Nav2 starts, but goals abort with `NO_VALID_PATH` (error 208).
+5. **Navigate to a goal.** *Status: blocked, set aside while step 3 is worked on.* Nav2 starts, but goals abort with `NO_VALID_PATH` (error 208).
    Findings so far: the lidar saw the floor when the robot tilted, which filled the costmap with false obstacles.
    I raised the lidar and added a front caster. That reduced the bad rays (88 to 11) but I did not confirm goals now work.
    Fix Nav2, or write a small navigator of your own.
