@@ -24,23 +24,23 @@ Out of scope for now: arm, gripper, cloth or any object manipulation, learned pe
 ## Steps
 Status: done / in progress / not started.
 
-1. **Drive the wheeled base.** *Status: done, partly checked.* A differential-drive base in Gazebo (`ros/worlds/room.sdf`)
-   driven by `/cmd_vel`, with `/odom`.
-   Check: wheel velocities drive straight and turn in place, and the measured pose matches the command within a set tolerance.
-   So far: straight drive and a turn were tried. A tolerance was never measured, and arcs were not tried.
-2. **Map with lidar SLAM.** *Status: done, partly checked.* A simulated 2D lidar on `/scan`, bridged to ROS 2, with `slam_toolbox`.
-   Check: a scripted drive builds a map that matches the room size, saved as an image.
-   So far: a 157x157 cell map (about 7.85 m) was built. It was not saved as an image.
-3. **ROS 2 basics in Python.** *Status: in progress.* Write your own nodes with `rclpy`, as colcon packages in `ros/src/`:
+1. **ROS 2 basics in Python.** *Status: in progress.* Write your own nodes with `rclpy`, as colcon packages in `ros/src/`:
    a publisher, a subscriber, and a node that reads `/scan` and publishes `/cmd_vel` (for example, stop before a wall).
    So far: `my_first_pkg` (a `talker` and a `listener` over `/chatter`) is written. Next: a second package that subscribes to `/scan`,
    then one that also publishes `/cmd_vel`.
    Check: the node drives the robot to stop 0.5 m from a wall in 5 of 5 runs.
    The workspace is built inside the container; see `ros/README.md`.
-4. **TF, time and QoS.** *Status: not started.* Draw the TF tree with `ros2 run tf2_tools view_frames`, add a static transform by hand,
+2. **TF, time and QoS.** *Status: not started.* Draw the TF tree with `ros2 run tf2_tools view_frames`, add a static transform by hand,
    and explain `use_sim_time` and QoS settings in your own words.
    Check: a short note in `README.md` and a working custom transform.
-5. **Navigate to a goal.** *Status: blocked, set aside while step 3 is worked on.* Nav2 starts, but goals abort with `NO_VALID_PATH` (error 208).
+3. **Drive the wheeled base.** *Status: not started.* A differential-drive base in Gazebo (`ros/worlds/room.sdf`)
+   driven by `/cmd_vel`, with `/odom`.
+   Check: wheel velocities drive straight and turn in place, and the measured pose matches the command within a set tolerance.
+   Starting point: the base and `/cmd_vel` setup already exist in `ros/worlds/room.sdf`, but you have not worked through this step yourself.
+4. **Map with lidar SLAM.** *Status: not started.* A simulated 2D lidar on `/scan`, bridged to ROS 2, with `slam_toolbox`.
+   Check: a scripted drive builds a map that matches the room size, saved as an image.
+   Starting point: `ros/launch/sim_slam.launch.py` already starts the lidar bridge and `slam_toolbox`, but you have not worked through this step yourself.
+5. **Navigate to a goal.** *Status: blocked, set aside while step 1 is worked on.* Nav2 starts, but goals abort with `NO_VALID_PATH` (error 208).
    Findings so far: the lidar saw the floor when the robot tilted, which filled the costmap with false obstacles.
    I raised the lidar and added a front caster. That reduced the bad rays (88 to 11) but I did not confirm goals now work.
    Fix Nav2, or write a small navigator of your own.
@@ -66,7 +66,7 @@ Learn how a real sensor gets into ROS 2. A 2D lidar on a Raspberry Pi 5 publishe
 and use it from your Mac. The robot does not move yet; carry or push it by hand.
 
 ## Before you start
-Milestone 1 steps 3 and 4 (ROS 2 basics in Python, TF, time and QoS) are the background for this milestone.
+Milestone 1 steps 1 and 2 (ROS 2 basics in Python, TF, time and QoS) are the background for this milestone.
 
 ## Parts to choose (not decided yet)
 - Raspberry Pi 5, 8 GB, with a fan or heatsink, a 5 V / 5 A power supply and a microSD card or SSD.
