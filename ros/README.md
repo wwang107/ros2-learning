@@ -51,7 +51,7 @@ In a terminal on the noVNC desktop:
 
 ```bash
 cd /opt/sim
-ros2 launch launch/sim_slam.launch.py      # sim + mapping
+podman exec -it -u ubuntu ros-gz bash     # sim + mapping
 ```
 
 Drive the robot to build the map (second terminal):
