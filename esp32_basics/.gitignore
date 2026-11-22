@@ -1,1 +1,3 @@
 .pio/
+.venv/
+compile_commands.json
