@@ -30,6 +30,13 @@ def generate_launch_description():
         remappings=[('/model/diff_bot/tf', '/tf')],
         parameters=[{'use_sim_time': True}])
 
+    # Robot shape for RViz's RobotModel display (one link, so it publishes no TF)
+    with open(os.path.join(ROOT, 'urdf', 'diff_bot.urdf')) as f:
+        robot_description = f.read()
+    robot_state = Node(
+        package='robot_state_publisher', executable='robot_state_publisher',
+        parameters=[{'robot_description': robot_description, 'use_sim_time': True}])
+
     # base -> lidar_link, matching the sensor pose in worlds/room.sdf
     lidar_tf = Node(
         package='tf2_ros', executable='static_transform_publisher',
@@ -63,4 +70,4 @@ def generate_launch_description():
             lifecycle_node_matcher=matches_action(slam),
             transition_id=Transition.TRANSITION_ACTIVATE))]))
 
-    return LaunchDescription([sim, gui, bridge, lidar_tf, slam, activate, configure])
+    return LaunchDescription([sim, gui, bridge, robot_state, lidar_tf, slam, activate, configure])

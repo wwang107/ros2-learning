@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!-- Shape only, for RViz. Sizes match worlds/room.sdf. One link, so no joints and no extra TF. -->
+<robot name="diff_bot">
+  <material name="blue"><color rgba="0.1 0.3 0.8 1"/></material>
+  <material name="dark"><color rgba="0.15 0.15 0.15 1"/></material>
+  <material name="red"><color rgba="0.9 0.2 0.2 1"/></material>
+
+  <link name="base">
+    <visual>
+      <geometry><box size="0.4 0.25 0.1"/></geometry>
+      <material name="blue"/>
+    </visual>
+    <visual>
+      <origin xyz="0 0.15 0" rpy="-1.5708 0 0"/>
+      <geometry><cylinder radius="0.1" length="0.04"/></geometry>
+      <material name="dark"/>
+    </visual>
+    <visual>
+      <origin xyz="0 -0.15 0" rpy="-1.5708 0 0"/>
+      <geometry><cylinder radius="0.1" length="0.04"/></geometry>
+      <material name="dark"/>
+    </visual>
+    <visual>
+      <origin xyz="0.1 0 0.15"/>
+      <geometry><cylinder radius="0.05" length="0.08"/></geometry>
+      <material name="red"/>
+    </visual>
+    <!-- front marker so you can tell which way the robot faces -->
+    <visual>
+      <origin xyz="0.17 0 0.06"/>
+      <geometry><box size="0.06 0.1 0.02"/></geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+</robot>
